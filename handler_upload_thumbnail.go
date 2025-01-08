@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -54,11 +51,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
 		return
 	}
-	extension := strings.Split(mediaType, "/")[1]
 
-	mediaData, err := io.ReadAll(file)
+	assetDiskPath := cfg.getAssetDiskPath(getAssetPath(videoID, mediaType))
+	fmt.Println("assetDiskPath: ", assetDiskPath)
+	dst, err := os.Create(assetDiskPath)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Read Media file failed", err)
+		respondWithError(w, http.StatusInternalServerError, "mediaFile failed to created", err)
+		return
+	}
+	defer dst.Close()
+	if _, err = io.Copy(dst, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "copy data to file failed", err)
 		return
 	}
 
@@ -67,24 +70,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusInternalServerError, "Couldn't find video", err)
 		return
 	}
+
 	if video.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "Not authorized to udpate this video", err)
 		return
 	}
-	filePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, extension))
 
-	mediaFile, err := os.Create(filePath)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "mediaFile failed to created", err)
-		return
-	}
-	_, err = io.Copy(mediaFile, bytes.NewBuffer(mediaData))
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "copy data to file failed", err)
-		return
-	}
-	videoURL := fmt.Sprintf("http://localhost:%s/assets/%s.%s", cfg.port, videoID, extension)
-	video.ThumbnailURL = &videoURL
+	assetURL := cfg.getAssetURL(getAssetPath(videoID, mediaType))
+	video.ThumbnailURL = &assetURL
+	fmt.Println("assetURL: ", assetURL)
+
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Get video from database failed", err)
