@@ -15,7 +15,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+
 		return
 	}
 
@@ -31,7 +31,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
+	fmt.Println("uploading thumbnail for video", "by user", userID)
 
 	const maxMemory = 10 << 20 //10 MB
 	err = r.ParseMultipartForm(maxMemory)
@@ -67,7 +67,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	assetDiskPath := cfg.getAssetDiskPath(getAssetPath(videoID, mediaType))
+	assetDiskPath := cfg.getAssetDiskPath(getAssetPath(mediaType))
 	fmt.Println("assetDiskPath: ", assetDiskPath)
 	dst, err := os.Create(assetDiskPath)
 	if err != nil {
@@ -91,7 +91,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	assetURL := cfg.getAssetURL(getAssetPath(videoID, mediaType))
+	assetURL := cfg.getAssetURL(assetDiskPath)
 	video.ThumbnailURL = &assetURL
 	fmt.Println("assetURL: ", assetURL)
 
