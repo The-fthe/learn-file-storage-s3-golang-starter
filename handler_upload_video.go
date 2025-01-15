@@ -68,6 +68,10 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	tempFile, err := os.CreateTemp("", "tubely-upload.mp4")
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "created tempFile failed", nil)
+		return
+	}
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 	if _, err = io.Copy(tempFile, videoSrc); err != nil {
