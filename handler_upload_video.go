@@ -17,12 +17,14 @@ import (
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
 	const maxMemory = 1 << 30 //10GB
 	r.Body = http.MaxBytesReader(w, r.Body, int64(maxMemory))
+
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "VideoID is not provided", err)
 		return
 	}
+
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't find video", err)
@@ -39,11 +41,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
 	}
-
 	if video.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "Not authorized to update this video", err)
 		return
 	}
+
 	videoSrc, header, err := r.FormFile("video")
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Getting video failed", err)
@@ -67,6 +69,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Not supported format", nil)
 		return
 	}
+
 	tempFile, err := os.CreateTemp("", "tubely-upload.mp4")
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "created tempFile failed", nil)
@@ -74,14 +77,16 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
+
 	if _, err = io.Copy(tempFile, videoSrc); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "copy data to file failed", err)
 		return
 	}
-	_, err = tempFile.Seek(0, io.SeekStart)
-	if err != nil {
+
+	if _, err = tempFile.Seek(0, io.SeekStart); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "failed to reset video file ", err)
 	}
+
 	key := getAssetPath(mediaType)
 	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
@@ -93,7 +98,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "failed to upload video to s3Bucket", err)
 		return
 	}
-	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Client.Options().Region, key)
+
+	videoURL := cfg.getObjectURL(key)
 	video.VideoURL = &videoURL
 	fmt.Println("VideoURL: ", videoURL)
 	err = cfg.db.UpdateVideo(video)
