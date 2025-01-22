@@ -27,6 +27,17 @@ func getAssetPath(mediaType string) string {
 	return fmt.Sprintf("%s%s", id, ext)
 }
 
+func getAssetPathWithPrefix(mediaType, prefix string) string {
+	randBytes := make([]byte, 32)
+	_, err := rand.Read(randBytes)
+	if err != nil {
+		panic("failed to generate bytes")
+	}
+	id := base64.RawURLEncoding.EncodeToString(randBytes)
+	ext := mediaTypeToExt(mediaType)
+	return fmt.Sprintf("%s/%s%s", prefix, id, ext)
+}
+
 func (cfg apiConfig) getAssetDiskPath(assetPath string) string {
 	return filepath.Join(cfg.assetsRoot, assetPath)
 }

@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
+	"os/exec"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
@@ -117,4 +120,47 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondWithJSON(w, http.StatusOK, videos)
+}
+
+func getVideoAspectRatio(filePath string) (string, error) {
+	type VideoMetadata struct {
+		Streams []struct {
+			Width  int `json:"width"`
+			Height int `json:"height"`
+		} `json:"streams"`
+	}
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+	fmt.Println("path: ", filePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	var videoMetadata VideoMetadata
+	err = json.Unmarshal(output, &videoMetadata)
+	if err != nil {
+		return "", err
+	}
+	if len(videoMetadata.Streams) == 0 {
+		return "", fmt.Errorf("Stream data is empty")
+	}
+	width := videoMetadata.Streams[0].Width
+	height := videoMetadata.Streams[0].Height
+	return getRatioName(width, height), nil
+}
+
+func getRatioName(width, height int) string {
+	ratio := float64(width) / float64(height)
+
+	// Round to 3 decimal places for comparison
+	rounded := math.Round(ratio*1000) / 1000
+	fmt.Println("round: ", rounded)
+
+	switch rounded {
+	case 1.778: // 16:9
+		return "landscape"
+	case 0.563: // 9:16 (vertical video)
+		return "portrait"
+	default:
+		return "other"
+	}
 }
