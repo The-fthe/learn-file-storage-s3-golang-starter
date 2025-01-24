@@ -75,7 +75,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "created tempFile failed", nil)
 		return
 	}
-	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
 	if _, err = io.Copy(tempFile, videoSrc); err != nil {
@@ -87,18 +86,31 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "failed to reset video file ", err)
 		return
 	}
-	ratio, err := getVideoAspectRatio(tempFile.Name())
+	processedVideoPath, err := processVideoForStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "created processVideo failed", err)
+	}
+	fmt.Println("ProcessVideoPath: ", processedVideoPath)
+	os.Remove(tempFile.Name())
+	defer os.Remove(processedVideoPath)
+	ratio, err := getVideoAspectRatio(processedVideoPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "failed to get vidoe ratio ", err)
 		return
 	}
 
 	key := getAssetPathWithPrefix(mediaType, ratio)
+	videoFile, err := os.Open(processedVideoPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to open vidoe file", err)
+		return
+	}
+	defer videoFile.Close()
 
 	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(key),
-		Body:        tempFile,
+		Body:        videoFile,
 		ContentType: aws.String(mediaType),
 	})
 	if err != nil {

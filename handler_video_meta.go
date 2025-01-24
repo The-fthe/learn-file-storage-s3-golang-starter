@@ -164,3 +164,14 @@ func getRatioName(width, height int) string {
 		return "other"
 	}
 }
+
+func processVideoForStart(filePath string) (string, error) {
+	output := filePath + ".processing"
+	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", output)
+	_, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+
+}
