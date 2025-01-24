@@ -27,7 +27,11 @@ func getAssetPath(mediaType string) string {
 	return fmt.Sprintf("%s%s", id, ext)
 }
 
-func getAssetPathWithPrefix(mediaType, prefix string) string {
+func getAssetPathWithPrefix(mediaName, prefix string) string {
+	return fmt.Sprintf("%s/%s", prefix, mediaName)
+}
+
+func getRandomAssetPathWithPrefix(mediaType, prefix string) string {
 	randBytes := make([]byte, 32)
 	_, err := rand.Read(randBytes)
 	if err != nil {

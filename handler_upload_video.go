@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
@@ -89,8 +86,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	processedVideoPath, err := processVideoForStart(tempFile.Name())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "created processVideo failed", err)
+
 	}
-	fmt.Println("ProcessVideoPath: ", processedVideoPath)
 	os.Remove(tempFile.Name())
 	defer os.Remove(processedVideoPath)
 	ratio, err := getVideoAspectRatio(processedVideoPath)
@@ -99,7 +96,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	key := getAssetPathWithPrefix(mediaType, ratio)
+	key := getAssetPathWithPrefix(header.Filename, ratio)
 	videoFile, err := os.Open(processedVideoPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "failed to open vidoe file", err)
@@ -107,25 +104,20 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	defer videoFile.Close()
 
-	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:      aws.String(cfg.s3Bucket),
-		Key:         aws.String(key),
-		Body:        videoFile,
-		ContentType: aws.String(mediaType),
-	})
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "failed to upload video to s3Bucket", err)
-		return
-	}
-
-	videoURL := cfg.getObjectURL(key)
+	videoURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, key)
+	fmt.Println("upload VideoURl: ", videoURL)
 	video.VideoURL = &videoURL
-	fmt.Println("VideoURL: ", videoURL)
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Get video from database failed", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, video)
+	signedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Signed video failed", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, signedVideo)
 }
